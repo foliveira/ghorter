@@ -1,8 +1,10 @@
 package main
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 )
@@ -20,7 +22,11 @@ func (mm *MethodMux) ServeHTTP(response http.ResponseWriter, request *http.Reque
 	}
 }
 
+var entries = make(map[string]string)
+
 func main() {
+	port := os.Getenv("PORT")
+
 	http.Handle("/",
 		&MethodMux{
 			map[string]func(http.ResponseWriter, *http.Request){
@@ -29,16 +35,16 @@ func main() {
 			},
 			NotImplementedHandler})
 
-	fmt.Println("listening on " + os.Getenv("PORT") + "...")
+	log.Println("listening on " + port + "...")
 
-	if err := http.ListenAndServe(":"+os.Getenv("PORT"), nil); err != nil {
+	if err := http.ListenAndServe(":"+port, nil); err != nil {
 		panic(err)
 	}
 }
 
 func GetRequestHandler(res http.ResponseWriter, req *http.Request) {
-	fmt.Fprintln(res, "Asked for ", req.URL.Path[1:])
-
+	uri := req.URL.Path[1:]
+	http.Redirect(res, req, entries[uri], 302)
 }
 
 func PostRequestHandler(res http.ResponseWriter, req *http.Request) {
@@ -49,7 +55,10 @@ func PostRequestHandler(res http.ResponseWriter, req *http.Request) {
 		http.Error(res, err.Error(), 500)
 	}
 
-	fmt.Fprintln(res, entry.Uri)
+	encodedUri := base64.StdEncoding.EncodeToString([]byte(entry.Uri))
+	entries[encodedUri] = entry.Uri
+
+	fmt.Fprintln(res, encodedUri)
 }
 
 func NotImplementedHandler(res http.ResponseWriter, req *http.Request) {
